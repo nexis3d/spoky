@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadows of the Labyrinth</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #stats {
+            padding: 20px;
+            color: #888;
+            font-size: 24px;
+            text-shadow: 2px 2px 0 #000;
+            letter-spacing: 2px;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .title {
+            font-size: 48px;
+            color: #aa0000;
+            text-transform: uppercase;
+            letter-spacing: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #ffcc00;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .instructions {
+            font-size: 16px;
+            color: #999;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background-color: transparent;
+            color: #fff;
+            border: 2px solid #500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            background-color: #500;
+            border-color: #f00;
+        }
+
+        /* JUMPSCARE STYLING */
+        #jumpscare {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 1000;
+            overflow: hidden;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #jumpscare img {
+            width: 90vmin;
+            height: 90vmin;
+            object-fit: contain;
+            animation: intense-shake 0.04s infinite;
+        }
+
+        @keyframes intense-shake {
+            0% { transform: translate(15px, 15px) scale(1.1); }
+            25% { transform: translate(-15px, -15px) scale(1.2); }
+            50% { transform: translate(-15px, 15px) scale(1.1); }
+            75% { transform: translate(15px, -15px) scale(1.2); }
+            100% { transform: translate(15px, 15px) scale(1.1); }
+        }
+
+        #win-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 20;
+            color: #fff;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            flex-direction: column;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+        }
+
+        #static-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.12"/></svg>');
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="static-overlay"></div>
+    <div id="ui-layer">
+        <div id="stats">Fragments: <span id="score">0</span> / 8</div>
+        <div id="crosshair"></div>
+    </div>
+
+    <div id="menu" class="overlay">
+        <div class="title">Void Stalker</div>
+        <div class="warning">
+            <span>🎧</span> Headphones Recommended
+        </div>
+        <div class="instructions">
+            The Tall One is relentless.<br>
+            Collect all 8 fragments to escape the void.<br>
+            It hears your movement. It feels your fear.<br><br>
+            W, A, S, D - Move | SHIFT - Run<br>
+            E - Toggle Flashlight | Mouse - Look
+        </div>
+        <button class="btn" id="start-btn">Enter the Void</button>
+    </div>
+
+    <div id="jumpscare">
+        <img src="Horo.png" alt="Scary Face">
+    </div>
+
+    <div id="win-screen" class="overlay">
+        <div style="color: #00ffaa;">Light Restored</div>
+        <button class="btn" id="restart-btn" style="margin-top: 30px; border-color: #00ffaa;">Play Again</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        let camera, scene, renderer;
+        let pitchObject, yawObject;
+        let flashlight;
+        let flashlightOn = true;
+        
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
+        let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+        let prevTime = performance.now();
+        
+        const walls = [], artifacts = [];
+        let monster, monsterGroup;
+        
+        let score = 0;
+        const totalArtifacts = 8;
+        let gameActive = false;
+        
+        let audioCtx, ambientDrone;
+
+        const menu = document.getElementById('menu');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const jumpscareScreen = document.getElementById('jumpscare');
+        const winScreen = document.getElementById('win-screen');
+        const scoreDisplay = document.getElementById('score');
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x010101);
+            scene.fog = new THREE.FogExp2(0x000000, 0.18); 
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            
+            pitchObject = new THREE.Group();
+            pitchObject.add(camera);
+            yawObject = new THREE.Group();
+            yawObject.position.y = 1.8; 
+            yawObject.add(pitchObject);
+            scene.add(yawObject);
+
+            flashlight = new THREE.SpotLight(0xffffff, 4.5, 40, Math.PI / 5, 0.5, 1);
+            flashlight.position.set(0.2, -0.2, 0);
+            flashlight.target.position.set(0, -0.2, -1);
+            pitchObject.add(flashlight);
+            pitchObject.add(flashlight.target);
+
+            scene.add(new THREE.AmbientLight(0x050505, 0.1));
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            createWorld();
+            spawnArtifacts();
+            createMonster();
+
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('resize', onWindowResize);
+
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', () => location.reload());
+
+            animate();
+        }
+
+        function createWorld() {
+            const mazeSize = 120;
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(mazeSize, mazeSize), floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a });
+            const wallHeight = 10;
+            const addW = (w, d, x, z) => {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, wallHeight, d), wallMat);
+                mesh.position.set(x, wallHeight/2, z);
+                scene.add(mesh);
+                walls.push(mesh);
+            };
+
+            // Outer Bounds
+            addW(mazeSize, 1, 0, -mazeSize/2);
+            addW(mazeSize, 1, 0, mazeSize/2);
+            addW(1, mazeSize, -mazeSize/2, 0);
+            addW(1, mazeSize, mazeSize/2, 0);
+
+            // Roof (Ceiling)
+            const roof = new THREE.Mesh(new THREE.PlaneGeometry(mazeSize, mazeSize), floorMat);
+            roof.rotation.x = Math.PI / 2; // Face downwards
+            roof.position.y = wallHeight;
+            scene.add(roof);
+
+            // Random Pillars and Walls
+            for(let i=0; i<60; i++) {
+                const rx = (Math.random() - 0.5) * 100;
+                const rz = (Math.random() - 0.5) * 100;
+                if (Math.abs(rx) < 10 && Math.abs(rz) < 10) continue;
+                addW(Math.random() * 8 + 2, Math.random() * 8 + 2, rx, rz);
+            }
+        }
+
+        function spawnArtifacts() {
+            const artGeo = new THREE.OctahedronGeometry(0.3);
+            const artMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true });
+            for(let i=0; i<totalArtifacts; i++) {
+                const m = new THREE.Mesh(artGeo, artMat);
+                m.add(new THREE.PointLight(0x00ffcc, 0.5, 4));
+                m.position.set((Math.random()-0.5)*90, 1.2, (Math.random()-0.5)*90);
+                scene.add(m);
+                artifacts.push({ mesh: m, collected: false });
+            }
+        }
+
+        function createMonster() {
+            monsterGroup = new THREE.Group();
+            const mMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            
+            // Torso
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.05, 5, 6), mMat);
+            body.position.y = 2.5;
+            monsterGroup.add(body);
+
+            // Head
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.7), mMat);
+            head.position.y = 5.2;
+            monsterGroup.add(head);
+
+            // Red Eyes
+            const eG = new THREE.SphereGeometry(0.1, 8, 8);
+            const eM = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const lE = new THREE.Mesh(eG, eM);
+            const rE = new THREE.Mesh(eG, eM);
+            lE.position.set(-0.25, 5.3, -0.4);
+            rE.position.set(0.25, 5.3, -0.4);
+            monsterGroup.add(lE, rE);
+
+            // Eerie aura light so you can partially see "it" creeping in the dark
+            const auraLight = new THREE.PointLight(0x440000, 2, 25);
+            auraLight.position.y = 4;
+            monsterGroup.add(auraLight);
+
+            monsterGroup.position.set(0, 0, 30);
+            scene.add(monsterGroup);
+            monster = monsterGroup;
+        }
+
+        function onKeyDown(e) {
+            if (e.code === 'KeyW') moveForward = true;
+            if (e.code === 'KeyS') moveBackward = true;
+            if (e.code === 'KeyA') moveLeft = true;
+            if (e.code === 'KeyD') moveRight = true;
+            if (e.code === 'ShiftLeft') isRunning = true;
+            if (e.code === 'KeyE') { flashlightOn = !flashlightOn; flashlight.intensity = flashlightOn ? 4.5 : 0; }
+        }
+
+        function onKeyUp(e) {
+            if (e.code === 'KeyW') moveForward = false;
+            if (e.code === 'KeyS') moveBackward = false;
+            if (e.code === 'KeyA') moveLeft = false;
+            if (e.code === 'KeyD') moveRight = false;
+            if (e.code === 'ShiftLeft') isRunning = false;
+        }
+
+        function onMouseMove(e) {
+            if (document.pointerLockElement !== document.body) return;
+            yawObject.rotation.y -= e.movementX * 0.002;
+            pitchObject.rotation.x -= e.movementY * 0.002;
+            pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            ambientDrone = audioCtx.createOscillator();
+            ambientDrone.type = 'sine';
+            ambientDrone.frequency.value = 40;
+            const g = audioCtx.createGain();
+            g.gain.value = 0.05;
+            ambientDrone.connect(g).connect(audioCtx.destination);
+            ambientDrone.start();
+        }
+
+        function startGame() {
+            document.body.requestPointerLock();
+            menu.style.display = 'none';
+            initAudio();
+            gameActive = true;
+            prevTime = performance.now();
+        }
+
+        function triggerJumpscare() {
+            gameActive = false;
+            document.exitPointerLock();
+            jumpscareScreen.style.display = 'flex';
+            
+            if (audioCtx) {
+                // Generate White Noise (Static Sound)
+                const bufferSize = audioCtx.sampleRate * 2; // 2 seconds of noise
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1; 
+                }
+                
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = buffer;
+                
+                // Add a lowpass filter to make it sound more like thick TV static
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 8000;
+                
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.8);
+                
+                whiteNoise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                whiteNoise.start();
+            }
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!gameActive) { renderer.render(scene, camera); return; }
+
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            prevTime = time;
+
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveLeft) - Number(moveRight);
+            direction.normalize();
+
+            const speed = isRunning ? 180 : 90;
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+            const moveVec = new THREE.Vector3(velocity.x * delta, 0, velocity.z * delta);
+            moveVec.applyQuaternion(yawObject.quaternion);
+
+            const nextX = yawObject.position.x + moveVec.x;
+            const nextZ = yawObject.position.z + moveVec.z;
+
+            // Simple Collision
+            let hitX = false, hitZ = false;
+            for(let w of walls) {
+                const b = new THREE.Box3().setFromObject(w);
+                b.expandByScalar(0.7);
+                if (b.containsPoint(new THREE.Vector3(nextX, 1.8, yawObject.position.z))) hitX = true;
+                if (b.containsPoint(new THREE.Vector3(yawObject.position.x, 1.8, nextZ))) hitZ = true;
+            }
+            if(!hitX) yawObject.position.x = nextX;
+            if(!hitZ) yawObject.position.z = nextZ;
+
+            // Monster Logic
+            const dist = monster.position.distanceTo(yawObject.position);
+            
+            // Speed matching
+            const mSpeed = (isRunning ? 11 : 6) + (score * 0.9);
+            const mDir = new THREE.Vector3().subVectors(yawObject.position, monster.position).normalize();
+            monster.lookAt(yawObject.position.x, monster.position.y, yawObject.position.z);
+            monster.position.addScaledVector(mDir, mSpeed * delta);
+
+            // Screen Shake
+            if (dist < 18) {
+                const intensity = Math.pow(Math.max(0, (18 - dist) / 18), 2) * 0.3;
+                camera.position.x = (Math.random() - 0.5) * intensity;
+                camera.position.y = (Math.random() - 0.5) * intensity;
+                if(ambientDrone) ambientDrone.frequency.value = 40 + (intensity * 200);
+            } else {
+                camera.position.set(0,0,0);
+            }
+
+            // Artifacts
+            for(let a of artifacts) {
+                if(!a.collected) {
+                    a.mesh.rotation.y += delta * 3;
+                    if(yawObject.position.distanceTo(a.mesh.position) < 2) {
+                        a.collected = true;
+                        scene.remove(a.mesh);
+                        score++;
+                        scoreDisplay.innerText = score;
+                        if(score === totalArtifacts) {
+                            gameActive = false;
+                            winScreen.style.display = 'flex';
+                            document.exitPointerLock();
+                        }
+                    }
+                }
+            }
+
+            if(dist < 2.5) triggerJumpscare();
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
